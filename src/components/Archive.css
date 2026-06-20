@@ -1,0 +1,275 @@
+/* ── 아카이브 쉘 ── */
+.archive { position: relative; }
+
+.archive-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.archive-tab {
+  flex: 1;
+  padding: 9px 0;
+  background: #f5f0eb;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #a89880;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.archive-tab.active {
+  background: #5c3d1e;
+  color: #fff;
+  font-weight: 600;
+}
+
+.archive-loading {
+  text-align: center;
+  padding: 60px 0;
+  color: #a89880;
+  font-size: 14px;
+}
+.archive-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 64px 20px;
+  color: #a89880;
+  text-align: center;
+  font-size: 15px;
+}
+.archive-empty span { font-size: 40px; }
+.archive-empty p { margin: 0; }
+
+/* ── 카드 (Feed.css 와 공유) ── */
+.entry-card {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(80, 50, 20, 0.07);
+}
+.card-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+.card-photo img { width: 100%; height: 100%; object-fit: cover; }
+.card-body { padding: 14px 16px 16px; }
+.card-date { display: block; font-size: 12px; color: #b0a090; margin-bottom: 6px; }
+.card-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #3d2a1a;
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+.card-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: #faf6f1;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.reply-dog { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.card-reply p {
+  font-size: 13px;
+  color: #7a6655;
+  margin: 0;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+/* ── 그리드 뷰 ── */
+.grid-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding-bottom: 96px;
+}
+.grid-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  background: #f5f0eb;
+  transition: opacity 0.15s;
+}
+.grid-cell:hover { opacity: 0.88; }
+.grid-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.grid-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 7px 5px;
+  background: linear-gradient(transparent, rgba(30, 15, 5, 0.4));
+  font-size: 11px;
+  color: #fff;
+}
+.grid-text-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 10px 8px;
+}
+.grid-cell-text {
+  font-size: 12px;
+  color: #7a6655;
+  line-height: 1.5;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.grid-cell-date { font-size: 10px; color: #b0a090; margin-top: 4px; }
+
+/* ── 달력 뷰 ── */
+.cal-view { }
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.cal-nav-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #5c3d1e;
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1;
+}
+.cal-month-label { font-size: 15px; font-weight: 600; color: #3d2a1a; }
+.cal-day-names {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 4px;
+}
+.cal-day-names span { font-size: 11px; color: #b0a090; padding: 3px 0; }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #c0ae98;
+}
+.cal-day.has-entry {
+  cursor: pointer;
+  color: #3d2a1a;
+  font-weight: 600;
+}
+.cal-day.has-entry:hover { background: #f5f0eb; }
+.cal-day.today { color: #5c3d1e; }
+.cal-day.selected { background: #5c3d1e !important; color: #fff !important; }
+.entry-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #5c3d1e;
+  margin-top: 2px;
+}
+.cal-day.selected .entry-dot { background: rgba(255, 255, 255, 0.65); }
+.cal-detail {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ede5da;
+  padding-bottom: 96px;
+  animation: archiveFadeUp 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cal-detail-label { font-size: 13px; color: #b0a090; margin: 0; }
+@keyframes archiveFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 타임라인 뷰 ── */
+.timeline-wrap { padding-bottom: 96px; }
+.month-section { margin-bottom: 8px; }
+.month-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.divider-line { flex: 1; height: 1px; background: #ede5da; }
+.divider-label { font-size: 12px; color: #b0a090; white-space: nowrap; }
+.month-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ── 기록 상세 모달 ── */
+.entry-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-sheet {
+  background: #fdf9f5;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 20px 20px 0 0;
+  max-height: 88dvh;
+  overflow-y: auto;
+  position: relative;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  background: #e0d5c8;
+  border-radius: 2px;
+  margin: 12px auto 0;
+}
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: #a89880;
+  cursor: pointer;
+  z-index: 1;
+}
+.modal-photo { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; }
+.modal-photo img { width: 100%; height: 100%; object-fit: cover; }
+.modal-body { padding: 16px 20px 32px; }
+.modal-body .card-text { margin-bottom: 0; }
+.modal-reply {
+  background: #fff;
+  border-radius: 14px 14px 14px 4px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.modal-reply p { font-size: 14px; line-height: 1.7; color: #3d2a1a; margin: 0; word-break: keep-all; }
+.modal-reply p + p { margin-top: 2px; }
+.modal-dog { font-size: 13px; color: #b0a090; margin-bottom: 8px !important; }

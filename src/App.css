@@ -1,0 +1,107 @@
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #fdf9f5;
+}
+
+/* 헤더 */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ede5da;
+  position: sticky;
+  top: 0;
+  background: #fdf9f5;
+  z-index: 10;
+}
+
+.back-btn {
+  font-size: 28px;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: #5c3d1e;
+  cursor: pointer;
+  padding: 0 8px 0 0;
+  width: 36px;
+}
+
+.app-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-paw { font-size: 20px; }
+.app-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #3d2a1a;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.header-spacer { width: 36px; }
+
+/* 토스트 */
+.toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #3d2a1a;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-size: 14px;
+  z-index: 100;
+  animation: slideDown 0.25s ease, fadeOut 0.4s ease 2.6s forwards;
+  white-space: nowrap;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes fadeOut {
+  to { opacity: 0; }
+}
+
+/* 메인 */
+.app-main {
+  flex: 1;
+  padding: 20px 20px 0;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* 하단 탭바 */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: #fdf9f5;
+  border-top: 1px solid #ede5da;
+  display: flex;
+  z-index: 20;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-nav button {
+  flex: 1;
+  padding: 10px 0 12px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: #c0ae98;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+.bottom-nav button.active { color: #5c3d1e; font-weight: 600; }

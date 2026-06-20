@@ -1,0 +1,120 @@
+.feed {
+  position: relative;
+  min-height: 100%;
+}
+
+/* 발자국 바 */
+.paws-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #a89880;
+  margin-bottom: 16px;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 96px;
+}
+
+.feed-loading,
+.feed-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #a89880;
+}
+.feed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.empty-icon { font-size: 48px; margin-bottom: 4px; }
+.feed-empty p { font-size: 16px; color: #7a6655; margin: 0; }
+.feed-empty small { font-size: 13px; }
+
+/* 카드 */
+.entry-card {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(80, 50, 20, 0.07);
+}
+
+.card-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+.card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-body {
+  padding: 14px 16px 16px;
+}
+
+.card-date {
+  display: block;
+  font-size: 12px;
+  color: #b0a090;
+  margin-bottom: 6px;
+}
+
+.card-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #3d2a1a;
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+
+/* 답글 미리보기 */
+.card-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: #faf6f1;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.reply-dog { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.card-reply p {
+  font-size: 13px;
+  color: #7a6655;
+  margin: 0;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+/* FAB */
+.fab {
+  position: fixed;
+  bottom: 72px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #5c3d1e;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(80, 50, 20, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.12s;
+}
+.fab:hover  { background: #4a2f14; transform: scale(1.06); }
+.fab:active { transform: scale(0.96); }
