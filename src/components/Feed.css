@@ -96,6 +96,37 @@
   -webkit-box-orient: vertical;
 }
 
+/* 사진 없는 카드 */
+.entry-card.no-photo {
+  border-left: 4px solid #e8d8c4;
+  background: #faf7f4;
+}
+.entry-card.no-photo .card-date {
+  font-size: 13px;
+  color: #8a7060;
+  font-weight: 600;
+}
+
+/* 통계 위젯 */
+.stats-widget {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 6px rgba(80, 50, 20, 0.06);
+}
+.stat-icon { font-size: 18px; flex-shrink: 0; }
+.stat-value { font-size: 15px; font-weight: 700; color: #3d2a1a; }
+.stat-label { font-size: 11px; color: #a89880; }
+
 /* FAB */
 .fab {
   position: fixed;

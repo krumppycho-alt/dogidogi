@@ -1,0 +1,187 @@
+/* ── 도기도기 SVG 강아지 공통 스타일 ── */
+
+.dog-svg { display: block; overflow: visible; }
+
+/* transform-box: fill-box 로 SVG 요소 자체 기준 변환 */
+.dog-svg .dog-part {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.dog-svg .dog-leg      { transform-box: fill-box; transform-origin: top center; }
+.dog-svg .dog-tail     { transform-box: fill-box; transform-origin: right center; }
+.dog-svg .dog-ear-l    { transform-box: fill-box; transform-origin: top center; }
+.dog-svg .dog-ear-r    { transform-box: fill-box; transform-origin: top center; }
+.dog-svg .dog-head     { transform-box: fill-box; transform-origin: center bottom; }
+.dog-svg .dog-body-grp { transform-box: fill-box; transform-origin: center center; }
+
+/* 견종별 CSS 변수 기본값 */
+.dog-svg {
+  --leg-angle:      23deg;
+  --tail-angle:     23deg;
+  --body-y:         2px;
+  --walk-speed:     1.0s;
+  --head-tilt:      10deg;
+  --think-speed:    1.0s;
+  --sniff-x:        5px;
+  --sniff-speed:    1.0s;
+}
+
+/* ══════════════════════════════════
+   1. 걷기 (Walking) — CSS 변수 적용
+══════════════════════════════════ */
+@keyframes dog-walk-body {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(calc(-1 * var(--body-y))); }
+}
+@keyframes dog-walk-leg-a {
+  0%, 100% { transform: rotate(var(--leg-angle)); }
+  50%       { transform: rotate(calc(-1 * var(--leg-angle))); }
+}
+@keyframes dog-walk-leg-b {
+  0%, 100% { transform: rotate(calc(-1 * var(--leg-angle))); }
+  50%       { transform: rotate(var(--leg-angle)); }
+}
+@keyframes dog-walk-tail {
+  0%, 100% { transform: rotate(calc(-1 * var(--tail-angle))); }
+  50%       { transform: rotate(var(--tail-angle)); }
+}
+@keyframes dog-walk-head {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-2px); }
+}
+
+.dog-walking .dog-body-grp { animation: dog-walk-body var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-fl   { animation: dog-walk-leg-a var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-fr   { animation: dog-walk-leg-b var(--walk-speed) ease-in-out infinite 0.5s; }
+.dog-walking .dog-leg-bl   { animation: dog-walk-leg-b var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-br   { animation: dog-walk-leg-a var(--walk-speed) ease-in-out infinite 0.5s; }
+.dog-walking .dog-tail     { animation: dog-walk-tail calc(var(--walk-speed) * 0.7) ease-in-out infinite; }
+.dog-walking .dog-head     { animation: dog-walk-head var(--walk-speed) ease-in-out infinite; }
+
+/* ══════════════════════════════════
+   2. 생각 중 (Thinking) — CSS 변수 적용
+══════════════════════════════════ */
+@keyframes dog-think-tail {
+  0%, 100% { transform: rotate(-10deg); }
+  50%       { transform: rotate(10deg); }
+}
+@keyframes dog-think-head {
+  0%, 30%, 70%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(calc(-1 * var(--head-tilt))); }
+}
+@keyframes dog-think-dot {
+  0%, 60%, 100% { opacity: 0; transform: scale(0.5) translateY(0); }
+  30%           { opacity: 1; transform: scale(1) translateY(-4px); }
+}
+
+.dog-thinking .dog-tail { animation: dog-think-tail 1.8s ease-in-out infinite; }
+.dog-thinking .dog-head { animation: dog-think-head calc(var(--think-speed) * 2.4) ease-in-out infinite; }
+.think-dot              { animation: dog-think-dot 1.2s ease-in-out infinite; }
+.think-dot:nth-child(2) { animation-delay: 0.2s; }
+.think-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ══════════════════════════════════
+   3. 잠 (Sleeping)
+══════════════════════════════════ */
+@keyframes dog-sleep-breathe {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  50%       { transform: scaleX(1.04) scaleY(0.97); }
+}
+@keyframes dog-sleep-zzz {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(8px, -28px) scale(1); }
+}
+@keyframes dog-sleep-ear {
+  0%, 85%, 100% { transform: rotate(0deg); }
+  90%           { transform: rotate(-8deg); }
+}
+
+.dog-sleeping .dog-body-grp { animation: dog-sleep-breathe 3s ease-in-out infinite; }
+.dog-sleeping .dog-ear-l    { animation: dog-sleep-ear 4s ease-in-out infinite; }
+.zzz-letter                 { animation: dog-sleep-zzz 2.4s ease-out infinite; }
+.zzz-letter:nth-child(2)    { animation-delay: 0.7s; font-size: 13px; }
+.zzz-letter:nth-child(3)    { animation-delay: 1.4s; font-size: 10px; }
+
+/* ══════════════════════════════════
+   4. 킁킁 (Sniffing / GPS) — CSS 변수 적용
+══════════════════════════════════ */
+@keyframes dog-sniff-sway {
+  0%, 100% { transform: translateX(calc(-1 * var(--sniff-x))) rotate(-3deg); }
+  50%       { transform: translateX(var(--sniff-x)) rotate(3deg); }
+}
+@keyframes dog-sniff-nose {
+  0%, 100% { transform: scaleY(1); }
+  25%, 75% { transform: scaleY(0.8); }
+  50%       { transform: scaleY(1.1); }
+}
+@keyframes dog-sniff-tail-alert {
+  0%, 100% { transform: rotate(-45deg); }
+  50%       { transform: rotate(-50deg); }
+}
+@keyframes dog-sniff-ear {
+  0%, 100% { transform: rotate(0deg); }
+  50%       { transform: rotate(12deg); }
+}
+
+.dog-sniffing .dog-body-grp  { animation: dog-sniff-sway var(--sniff-speed) ease-in-out infinite; }
+.dog-sniffing .dog-nose      { animation: dog-sniff-nose calc(var(--sniff-speed) * 0.45) ease-in-out infinite; }
+.dog-sniffing .dog-tail      { animation: dog-sniff-tail-alert calc(var(--sniff-speed) * 2) ease-in-out infinite; }
+.dog-sniffing .dog-ear-l     { animation: dog-sniff-ear var(--sniff-speed) ease-in-out infinite; }
+
+/* 앉아있기 (기본 정지 상태) */
+@keyframes dog-sit-tail {
+  0%, 100% { transform: rotate(-5deg); }
+  50%       { transform: rotate(5deg); }
+}
+.dog-sitting .dog-tail { animation: dog-sit-tail 1.5s ease-in-out infinite; }
+
+/* ══════════════════════════════════
+   5. 발바닥 리워드 (Paw Reward)
+══════════════════════════════════ */
+@keyframes paw-fly {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.3) rotate(0deg); }
+  15%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--px, 0px), var(--py, -80px)) scale(1.1) rotate(var(--pr, 30deg)); }
+}
+
+.paw-particle { animation: paw-fly 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+
+/* ══════════════════════════════════
+   6. 배지 (Achievement)
+══════════════════════════════════ */
+@keyframes badge-pop {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-15deg); }
+  60%  { transform: scale(1.15) rotate(5deg); opacity: 1; }
+  80%  { transform: scale(0.95) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes badge-shine {
+  0%   { opacity: 0; transform: rotate(0deg) scale(0.8); }
+  50%  { opacity: 0.6; }
+  100% { opacity: 0; transform: rotate(30deg) scale(1.4); }
+}
+@keyframes badge-star {
+  0%   { opacity: 0; transform: scale(0) rotate(0deg); }
+  60%  { opacity: 1; transform: scale(1.2) rotate(15deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+.badge-icon   { animation: badge-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.badge-ring   { animation: badge-shine 1s ease-out 0.4s forwards; opacity: 0; }
+.badge-star   { animation: badge-star 0.5s ease-out forwards; }
+.badge-star:nth-child(2) { animation-delay: 0.1s; }
+.badge-star:nth-child(3) { animation-delay: 0.2s; }
+.badge-star:nth-child(4) { animation-delay: 0.15s; }
+.badge-star:nth-child(5) { animation-delay: 0.25s; }
+
+/* ══════════════════════════════════
+   유틸
+══════════════════════════════════ */
+@keyframes pulse-gps {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.5); }
+}
+.pulse-ring { animation: pulse-gps 1.5s ease-in-out infinite; }

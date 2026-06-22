@@ -76,3 +76,18 @@
 }
 .submit-btn:hover:not(:disabled) { background: #4a2f14; }
 .submit-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* 저장 중 강아지 상태 */
+.saving-dog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+.think-dots {
+  display: flex;
+  gap: 4px;
+  font-size: 18px;
+  color: #c97a3a;
+}

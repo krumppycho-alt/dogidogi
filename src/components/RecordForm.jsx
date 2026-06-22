@@ -4,6 +4,8 @@ import { saveEntry } from '../lib/storage'
 import { generateReply } from '../lib/reply'
 import { calcPaws, addPaws } from '../lib/paws'
 import { syncEntry } from '../lib/sync'
+import DogSVG from '../animations/DogSVG'
+import { getBreed } from '../lib/breeds'
 import './RecordForm.css'
 
 export default function RecordForm({ onSaved }) {
@@ -74,9 +76,20 @@ export default function RecordForm({ onSaved }) {
       />
       <div className="char-count">{text.trim().length} / 300</div>
 
-      <button className="submit-btn" type="submit" disabled={!canSubmit}>
-        {saving ? '도기 답장 받는 중…' : '기록하기'}
-      </button>
+      {saving ? (
+        <div className="saving-dog">
+          <DogSVG breed={getBreed('mixed')} animation="thinking" size={72} />
+          <div className="think-dots">
+            <span className="think-dot">•</span>
+            <span className="think-dot">•</span>
+            <span className="think-dot">•</span>
+          </div>
+        </div>
+      ) : (
+        <button className="submit-btn" type="submit" disabled={!canSubmit}>
+          기록하기
+        </button>
+      )}
     </form>
   )
 }

@@ -1,11 +1,22 @@
+import { useState } from 'react'
+import PawReward from '../animations/PawReward'
+import DogSVG from '../animations/DogSVG'
+import { getBreed } from '../lib/breeds'
 import './PostSave.css'
 
 export default function PostSave({ entry, pawsEarned, totalPaws, onDone }) {
+  const [showReward, setShowReward] = useState(true)
   const lines = entry.reply?.split('\n') ?? []
 
   return (
     <div className="postsave">
-      <div className="postsave-dog">🐶</div>
+      {showReward && (
+        <PawReward count={Math.min(pawsEarned, 10)} onDone={() => setShowReward(false)} />
+      )}
+
+      <div className="postsave-dog">
+        <DogSVG breed={getBreed('mixed')} animation="walking" size={110} />
+      </div>
 
       <div className="reply-bubble">
         {lines.map((line, i) => (
@@ -17,11 +28,6 @@ export default function PostSave({ entry, pawsEarned, totalPaws, onDone }) {
         <span className="paw-icon">🐾</span>
         <span className="paws-earned">+{pawsEarned}</span>
         <span className="paws-total">누적 {totalPaws}개</span>
-      </div>
-
-      <div className="teaser">
-        <span className="teaser-icon">🗺️</span>
-        <p>추억 지도 · 산책 GPS 기록<br /><strong>곧 업데이트</strong>됩니다</p>
       </div>
 
       <button className="done-btn" onClick={onDone}>

@@ -12,7 +12,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.postsave-dog { font-size: 64px; }
+.postsave-dog { display: flex; justify-content: center; }
 
 /* 말풍선 */
 .reply-bubble {

@@ -1,0 +1,50 @@
+.install-banner {
+  background: #fff8f0;
+  border-bottom: 1px solid #ede5da;
+  padding: 10px 16px;
+}
+
+.install-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.install-icon { font-size: 20px; flex-shrink: 0; }
+
+.install-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.install-text strong { font-size: 13px; color: #3d2a1a; font-weight: 700; }
+.install-text span   { font-size: 11px; color: #a89880; }
+
+.install-add-btn {
+  background: #5c3d1e;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.install-add-btn:hover { background: #4a2f14; }
+
+.install-close {
+  background: none;
+  border: none;
+  color: #c0ae98;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+  line-height: 1;
+}

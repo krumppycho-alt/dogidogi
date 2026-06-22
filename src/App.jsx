@@ -3,10 +3,12 @@ import Feed from './components/Feed'
 import RecordForm from './components/RecordForm'
 import PostSave from './components/PostSave'
 import Archive from './components/Archive'
+import WalkTab from './components/WalkTab'
+import InstallBanner from './components/InstallBanner'
 import './App.css'
 
 export default function App() {
-  // page: 'feed' | 'record' | 'postsave' | 'archive'
+  // page: 'feed' | 'record' | 'postsave' | 'archive' | 'walk'
   const [page, setPage] = useState('feed')
   const [saveResult, setSaveResult] = useState(null)
   const [feedKey, setFeedKey] = useState(0)
@@ -23,10 +25,12 @@ export default function App() {
   }
 
   const showBack = page === 'record'
-  const showNav = page === 'feed' || page === 'archive'
+  const showNav = page === 'feed' || page === 'archive' || page === 'walk'
 
   return (
     <div className="app">
+      <InstallBanner />
+
       <header className="app-header">
         {showBack
           ? <button className="back-btn" onClick={() => setPage('feed')}>‹</button>
@@ -55,6 +59,7 @@ export default function App() {
           />
         )}
         {page === 'archive' && <Archive key={page} />}
+        {page === 'walk' && <WalkTab />}
       </main>
 
       {showNav && (
@@ -63,13 +68,19 @@ export default function App() {
             className={page === 'feed' ? 'active' : ''}
             onClick={() => setPage('feed')}
           >
-            🏠 피드
+            🏠<br /><span>홈</span>
+          </button>
+          <button
+            className={page === 'walk' ? 'active' : ''}
+            onClick={() => setPage('walk')}
+          >
+            🐾<br /><span>산책</span>
           </button>
           <button
             className={page === 'archive' ? 'active' : ''}
             onClick={() => setPage('archive')}
           >
-            📖 추억
+            📖<br /><span>추억</span>
           </button>
         </nav>
       )}
