@@ -14,10 +14,20 @@ import './WalkTab.css'
 
 const DEFAULT_BREED_ID = 'mixed'
 
-export default function WalkTab() {
+const ACTIVITY_BUTTONS = [
+  { type: 'snack',   emoji: '🦴', label: '간식' },
+  { type: 'water',   emoji: '💧', label: '물' },
+  { type: 'pee',     emoji: '💛', label: '소변' },
+  { type: 'poop',    emoji: '💩', label: '대변' },
+  { type: 'friend',  emoji: '🐕', label: '친구' },
+  { type: 'tired',   emoji: '😮‍💨', label: '지침' },
+]
+
+export default function WalkTab({ onSaved }) {
   const [walkState, setWalkState] = useState('idle')  // idle | active | paused | summary
   const [breedId, setBreedId] = useState(() => localStorage.getItem('dogidogi_breed') ?? DEFAULT_BREED_ID)
   const [showBreedPicker, setShowBreedPicker] = useState(false)
+  const [activities, setActivities] = useState([])
 
   // 진행 중 산책 데이터
   const [route, setRoute] = useState([])
@@ -85,11 +95,18 @@ export default function WalkTab() {
   }, [])
 
   // ── 산책 시작 ────────────────────────────────────────────────
+  function addActivity(type) {
+    const btn = ACTIVITY_BUTTONS.find(b => b.type === type)
+    if (!btn) return
+    setActivities(prev => [...prev, { type, emoji: btn.emoji, label: btn.label, time: elapsed, at: new Date().toISOString() }])
+  }
+
   function handleStart() {
     setRoute([])
     setElapsed(0)
     pausedElapsedRef.current = 0
     setWalkNote('')
+    setActivities([])
     setWalkState('active')
     startGPS()
     startTimer()
@@ -117,7 +134,7 @@ export default function WalkTab() {
     const paws = calcWalkPaws(distanceM)
     const totalPaws = await addPaws(paws)
     const replyText = await generateReply(`산책 ${formatDistance(distanceM)} 완료! ${formatDuration(elapsed)} 걸었어.`)
-    setSummary({ distanceM, durationS: elapsed, route: [...route], paws, totalPaws, reply: replyText })
+    setSummary({ distanceM, durationS: elapsed, route: [...route], paws, totalPaws, reply: replyText, activities: [...activities] })
     setWalkState('summary')
     setShowPawReward(true)
   }
@@ -131,10 +148,12 @@ export default function WalkTab() {
       reply: summary.reply,
       paws: summary.paws,
       walkData: { distanceM: summary.distanceM, durationS: summary.durationS },
+      activities: summary.activities,
     }
     const saved = await saveEntry(draft)
     syncEntry(saved)
     setSavingNote(false)
+    onSaved?.()
     handleDone()
   }
 
@@ -145,6 +164,7 @@ export default function WalkTab() {
     setElapsed(0)
     pausedElapsedRef.current = 0
     setWalkNote('')
+    setActivities([])
     setShowPawReward(false)
   }
 
@@ -240,6 +260,30 @@ export default function WalkTab() {
             </svg>
           )}
         </div>
+
+        {/* 활동 버튼 */}
+        <div className="walk-activity-panel">
+          {ACTIVITY_BUTTONS.map(btn => {
+            const count = activities.filter(a => a.type === btn.type).length
+            return (
+              <button key={btn.type} className="walk-act-btn" onClick={() => addActivity(btn.type)}>
+                <span className="act-emoji">{btn.emoji}</span>
+                <span className="act-label">{btn.label}</span>
+                {count > 0 && <span className="act-count">{count}</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* 활동 로그 */}
+        {activities.length > 0 && (
+          <div className="walk-activity-log">
+            {activities.slice(-3).map((a, i) => (
+              <span key={i} className="act-log-chip">{a.emoji} {a.label} {formatDuration(a.time)}</span>
+            ))}
+            {activities.length > 3 && <span className="act-log-more">+{activities.length - 3}개</span>}
+          </div>
+        )}
 
         {/* 컨트롤 */}
         <div className="walk-controls">

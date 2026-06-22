@@ -207,6 +207,71 @@
 .walk-ctrl-btn.resume { background: #c97a3a; color: #fff; }
 .walk-ctrl-btn.stop   { background: #3d2a1a; color: #fff; }
 
+/* ── 활동 버튼 패널 ──────────────────────────────────────── */
+.walk-activity-panel {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 8px;
+}
+.walk-act-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px 7px;
+  background: #fff;
+  border: 1.5px solid #ede5da;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+.walk-act-btn:active { background: #f0e8dc; border-color: #c97a3a; }
+.act-emoji { font-size: 20px; line-height: 1; }
+.act-label { font-size: 10px; color: #7a6655; line-height: 1; }
+.act-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  background: #c97a3a;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.walk-activity-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 8px;
+}
+.act-log-chip {
+  font-size: 11px;
+  background: #f5f0eb;
+  border-radius: 20px;
+  padding: 3px 10px;
+  color: #7a6655;
+}
+.act-log-more {
+  font-size: 11px;
+  color: #b0a090;
+  padding: 3px 6px;
+}
+
 /* ── SUMMARY ────────────────────────────────────────────── */
 .walk-summary {
   gap: 16px;
