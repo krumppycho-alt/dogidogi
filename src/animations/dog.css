@@ -2,16 +2,15 @@
 
 .dog-svg { display: block; overflow: visible; }
 
-/* transform-box: fill-box 로 SVG 요소 자체 기준 변환 */
-.dog-svg .dog-part {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.dog-svg .dog-leg      { transform-box: fill-box; transform-origin: top center; }
-.dog-svg .dog-tail     { transform-box: fill-box; transform-origin: right center; }
-.dog-svg .dog-ear-l    { transform-box: fill-box; transform-origin: top center; }
-.dog-svg .dog-ear-r    { transform-box: fill-box; transform-origin: top center; }
-.dog-svg .dog-head     { transform-box: fill-box; transform-origin: center bottom; }
+/* view-box: SVG 좌표계 기준 — inline style의 절대 px 값과 일치 */
+.dog-svg .dog-part     { transform-box: view-box; transform-origin: center center; }
+.dog-svg .dog-leg      { transform-box: view-box; }
+.dog-svg .dog-tail     { transform-box: view-box; }
+.dog-svg .dog-ear-l    { transform-box: view-box; }
+.dog-svg .dog-ear-r    { transform-box: view-box; }
+/* dog-head: 머리 원 바닥(목 위치) 기준 회전 — cx=120 cy=68 r=28 → bottom y=96 */
+.dog-svg .dog-head     { transform-box: view-box; transform-origin: 120px 96px; }
+/* body-grp: fill-box center 가 가장 자연스러운 호흡/스웨이 기준 */
 .dog-svg .dog-body-grp { transform-box: fill-box; transform-origin: center center; }
 
 /* 견종별 CSS 변수 기본값 */
@@ -100,9 +99,9 @@
 
 .dog-sleeping .dog-body-grp { animation: dog-sleep-breathe 3s ease-in-out infinite; }
 .dog-sleeping .dog-ear-l    { animation: dog-sleep-ear 4s ease-in-out infinite; }
-.zzz-letter                 { animation: dog-sleep-zzz 2.4s ease-out infinite; }
-.zzz-letter:nth-child(2)    { animation-delay: 0.7s; font-size: 13px; }
-.zzz-letter:nth-child(3)    { animation-delay: 1.4s; font-size: 10px; }
+.zzz-letter  { animation: dog-sleep-zzz 2.4s ease-out infinite; }
+.zzz-d1      { animation-delay: 0.7s; }
+.zzz-d2      { animation-delay: 1.4s; }
 
 /* ══════════════════════════════════
    4. 킁킁 (Sniffing / GPS) — CSS 변수 적용

@@ -16,7 +16,7 @@ const DEFAULT_BREED_ID = 'mixed'
 
 export default function WalkTab() {
   const [walkState, setWalkState] = useState('idle')  // idle | active | paused | summary
-  const [breedId, setBreedId] = useState(DEFAULT_BREED_ID)
+  const [breedId, setBreedId] = useState(() => localStorage.getItem('dogidogi_breed') ?? DEFAULT_BREED_ID)
   const [showBreedPicker, setShowBreedPicker] = useState(false)
 
   // 진행 중 산책 데이터
@@ -38,6 +38,8 @@ export default function WalkTab() {
   const pausedElapsedRef = useRef(0)
 
   const breed = getBreed(breedId)
+
+  useEffect(() => { localStorage.setItem('dogidogi_breed', breedId) }, [breedId])
 
   // ── GPS 추적 ────────────────────────────────────────────────
   const startGPS = useCallback(() => {
