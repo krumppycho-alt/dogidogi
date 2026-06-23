@@ -8,15 +8,22 @@
 .dog-svg .dog-tail     { transform-box: view-box; }
 .dog-svg .dog-ear-l    { transform-box: view-box; }
 .dog-svg .dog-ear-r    { transform-box: view-box; }
-/* dog-head: 머리 원 바닥(목 위치) 기준 회전 — cx=120 cy=68 r=28 → bottom y=96 */
+/* dog-head: 목 아랫부분(120,96) 기준 회전 */
 .dog-svg .dog-head     { transform-box: view-box; transform-origin: 120px 96px; }
-/* body-grp: fill-box center 가 가장 자연스러운 호흡/스웨이 기준 */
+/* body-grp: fill-box center */
 .dog-svg .dog-body-grp { transform-box: fill-box; transform-origin: center center; }
+
+/* 무릎 관절 (v2 리그) — 기본 8deg 살짝 구부린 자세 */
+.dog-svg .dog-leg-bl-knee,
+.dog-svg .dog-leg-br-knee,
+.dog-svg .dog-leg-fl-knee,
+.dog-svg .dog-leg-fr-knee { transform-box: view-box; transform: rotate(8deg); }
 
 /* 견종별 CSS 변수 기본값 */
 .dog-svg {
-  --leg-angle:      23deg;
-  --tail-angle:     23deg;
+  --leg-angle:      22deg;
+  --knee-bend:      14deg;
+  --tail-angle:     22deg;
   --body-y:         2px;
   --walk-speed:     1.0s;
   --head-tilt:      10deg;
@@ -49,13 +56,28 @@
   50%       { transform: translateY(-2px); }
 }
 
-.dog-walking .dog-body-grp { animation: dog-walk-body var(--walk-speed) ease-in-out infinite; }
-.dog-walking .dog-leg-fl   { animation: dog-walk-leg-a var(--walk-speed) ease-in-out infinite; }
-.dog-walking .dog-leg-fr   { animation: dog-walk-leg-b var(--walk-speed) ease-in-out infinite 0.5s; }
-.dog-walking .dog-leg-bl   { animation: dog-walk-leg-b var(--walk-speed) ease-in-out infinite; }
-.dog-walking .dog-leg-br   { animation: dog-walk-leg-a var(--walk-speed) ease-in-out infinite 0.5s; }
-.dog-walking .dog-tail     { animation: dog-walk-tail calc(var(--walk-speed) * 0.7) ease-in-out infinite; }
-.dog-walking .dog-head     { animation: dog-walk-head var(--walk-speed) ease-in-out infinite; }
+/* 무릎 관절 애니메이션 — fl/br 쌍 vs fr/bl 쌍 위상 반대 */
+@keyframes dog-walk-knee-a {
+  0%, 100% { transform: rotate(var(--knee-bend)); }
+  50%       { transform: rotate(calc(var(--knee-bend) * 0.2)); }
+}
+@keyframes dog-walk-knee-b {
+  0%, 100% { transform: rotate(calc(var(--knee-bend) * 0.2)); }
+  50%       { transform: rotate(var(--knee-bend)); }
+}
+
+.dog-walking .dog-body-grp    { animation: dog-walk-body var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-fl      { animation: dog-walk-leg-a var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-fr      { animation: dog-walk-leg-b var(--walk-speed) ease-in-out infinite 0.5s; }
+.dog-walking .dog-leg-bl      { animation: dog-walk-leg-b var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-br      { animation: dog-walk-leg-a var(--walk-speed) ease-in-out infinite 0.5s; }
+.dog-walking .dog-tail        { animation: dog-walk-tail calc(var(--walk-speed) * 0.7) ease-in-out infinite; }
+.dog-walking .dog-head        { animation: dog-walk-head var(--walk-speed) ease-in-out infinite; }
+/* fl과 br은 동위상, fr과 bl은 반대위상 */
+.dog-walking .dog-leg-fl-knee { animation: dog-walk-knee-a var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-br-knee { animation: dog-walk-knee-b var(--walk-speed) ease-in-out infinite 0.5s; }
+.dog-walking .dog-leg-bl-knee { animation: dog-walk-knee-a var(--walk-speed) ease-in-out infinite; }
+.dog-walking .dog-leg-fr-knee { animation: dog-walk-knee-b var(--walk-speed) ease-in-out infinite 0.5s; }
 
 /* ══════════════════════════════════
    2. 생각 중 (Thinking) — CSS 변수 적용
