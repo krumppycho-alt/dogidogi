@@ -2,7 +2,7 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #fdf9f5;
+  background: var(--paper);
 }
 
 /* 헤더 */
@@ -10,11 +10,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #ede5da;
+  padding: 13px 18px 9px;
+  border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  background: #fdf9f5;
+  background: var(--paper);
   z-index: 10;
 }
 
@@ -23,7 +23,7 @@
   line-height: 1;
   background: none;
   border: none;
-  color: #5c3d1e;
+  color: var(--ink);
   cursor: pointer;
   padding: 0 8px 0 0;
   width: 36px;
@@ -34,11 +34,19 @@
   align-items: center;
   gap: 6px;
 }
-.app-paw { font-size: 20px; }
+.app-paw {
+  font-size: 18px;
+  align-self: center;
+  animation: app-paw-bob 2.4s ease-in-out infinite;
+}
+@keyframes app-paw-bob {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50%       { transform: translateY(-3px) rotate(4deg); }
+}
 .app-title {
   font-size: 20px;
   font-weight: 700;
-  color: #3d2a1a;
+  color: var(--ink);
   letter-spacing: -0.3px;
   margin: 0;
 }
@@ -51,8 +59,8 @@
   top: 72px;
   left: 50%;
   transform: translateX(-50%);
-  background: #3d2a1a;
-  color: #fff;
+  background: var(--ink);
+  color: var(--paper);
   padding: 10px 20px;
   border-radius: 24px;
   font-size: 14px;
@@ -77,6 +85,7 @@
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+  padding-bottom: 68px;
 }
 
 /* 하단 탭바 */
@@ -87,8 +96,8 @@
   transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
-  background: #fdf9f5;
-  border-top: 1px solid #ede5da;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
   display: flex;
   z-index: 20;
   padding-bottom: env(safe-area-inset-bottom);
@@ -99,7 +108,7 @@
   background: none;
   border: none;
   font-size: 18px;
-  color: #c0ae98;
+  color: var(--muted);
   cursor: pointer;
   font-family: inherit;
   transition: color 0.15s;
@@ -112,7 +121,4 @@
   font-size: 11px;
   margin-top: 2px;
 }
-.bottom-nav button.active { color: #5c3d1e; font-weight: 600; }
-
-/* 앱 메인 하단 패딩 (탭바 여백) */
-.app-main { padding-bottom: 68px; }
+.bottom-nav button.active { color: var(--pine); font-weight: 600; }

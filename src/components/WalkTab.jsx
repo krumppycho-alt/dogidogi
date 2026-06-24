@@ -1,385 +1,506 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import DogSVG from '../animations/DogSVG'
-import PawReward from '../animations/PawReward'
-import { getBreed, BREED_LIST } from '../lib/breeds'
-import {
-  haversineDistance, calcTotalDistance, formatDuration, formatDistance,
-  routeToSVGPath, shouldAddPoint, calcWalkPaws
-} from '../lib/geo'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { addPaws } from '../lib/paws'
 import { generateReply } from '../lib/reply'
 import { saveEntry } from '../lib/storage'
 import { syncEntry } from '../lib/sync'
 import './WalkTab.css'
 
-const DEFAULT_BREED_ID = 'mixed'
-
-const ACTIVITY_BUTTONS = [
-  { type: 'snack',   emoji: '🦴', label: '간식' },
-  { type: 'water',   emoji: '💧', label: '물' },
-  { type: 'pee',     emoji: '💛', label: '소변' },
-  { type: 'poop',    emoji: '💩', label: '대변' },
-  { type: 'friend',  emoji: '🐕', label: '친구' },
-  { type: 'tired',   emoji: '😮‍💨', label: '지침' },
+const PRESETS = [
+  { id: '신남', emoji: '😄', label: '신남' },
+  { id: '똥',  emoji: '💩', label: '똥'  },
+  { id: '쉬',  emoji: '💦', label: '쉬'  },
+  { id: '친구', emoji: '🐕', label: '친구' },
+  { id: '거부', emoji: '🙅', label: '거부' },
+  { id: '새길', emoji: '🗺️', label: '새길' },
+  { id: '지침', emoji: '🫠', label: '지침' },
+  { id: '물',  emoji: '💧', label: '물'  },
+  { id: '간식', emoji: '🦴', label: '간식' },
+]
+const EMOJI_CHOICES = ['🐾','🌳','🐦','🐈','🚗','🌧️','🥎','😴','🤝','🌸','🍖','💨']
+const WEATHER = [
+  { id: '맑음', emoji: '☀️' },
+  { id: '더움', emoji: '🥵' },
+  { id: '비',   emoji: '🌧️' },
+  { id: '흐림', emoji: '☁️' },
+  { id: '추움', emoji: '❄️' },
 ]
 
+const W = 340, H = 360, TRAVERSE_SEC = 60, FULL_KM = 1.7
+const BLOCKS = [
+  { x: 24,  y: 46,  w: 80, h: 58 },
+  { x: 232, y: 38,  w: 84, h: 64, park: true },
+  { x: 40,  y: 154, w: 66, h: 78 },
+  { x: 234, y: 146, w: 82, h: 86 },
+  { x: 120, y: 248, w: 90, h: 62, park: true },
+  { x: 28,  y: 258, w: 64, h: 70 },
+]
+const SH = [62, 136, 214, 282], SV = [80, 170, 256]
+
+function makeWaypoints() {
+  const pts = [[170, 322]]; let x = 170, y = 322
+  ;[[-70,-42],[40,-48],[76,-38],[-30,-50],[-84,-38],[24,-48],[68,-40],[-42,-32]].forEach(([dx,dy]) => {
+    x = Math.max(38, Math.min(W-38, x + dx + (Math.random()*20-10)))
+    y = Math.max(34, Math.min(H-34, y + dy + (Math.random()*14-7)))
+    pts.push([Math.round(x), Math.round(y)])
+  })
+  return pts
+}
+
+function sampleRoute(pts) {
+  const out = [{ x: pts[0][0], y: pts[0][1] }], steps = 18
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p0 = out[out.length-1]
+    const c  = { x: pts[i][0], y: pts[i][1] }
+    const m  = { x: (pts[i][0]+pts[i+1][0])/2, y: (pts[i][1]+pts[i+1][1])/2 }
+    for (let s = 1; s <= steps; s++) {
+      const t = s/steps
+      out.push({ x:(1-t)*(1-t)*p0.x+2*(1-t)*t*c.x+t*t*m.x, y:(1-t)*(1-t)*p0.y+2*(1-t)*t*c.y+t*t*m.y })
+    }
+  }
+  const last = pts[pts.length-1], p0 = out[out.length-1]
+  for (let s = 1; s <= steps; s++) {
+    const t = s/steps
+    out.push({ x: p0.x+(last[0]-p0.x)*t, y: p0.y+(last[1]-p0.y)*t })
+  }
+  return out
+}
+
+const poly  = (a) => a.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+const fmt   = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`
+const todName = (h) => h < 6 ? '이른 새벽' : h < 11 ? '아침' : h < 16 ? '한낮' : h < 19 ? '해질녘' : h < 22 ? '저녁' : '밤'
+
 export default function WalkTab({ onSaved }) {
-  const [walkState, setWalkState] = useState('idle')  // idle | active | paused | summary
-  const [breedId, setBreedId] = useState(() => localStorage.getItem('dogidogi_breed') ?? DEFAULT_BREED_ID)
-  const [showBreedPicker, setShowBreedPicker] = useState(false)
-  const [activities, setActivities] = useState([])
+  const [dogName, setDogName]       = useState(() => localStorage.getItem('dogidogi_dog_name') || '우리 강아지')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [composer, setComposer]     = useState(null)
+  const [customs,  setCustoms]      = useState([])
+  const [screen,   setScreen]       = useState('idle')   // idle | walk | journal | letter
+  const [elapsed,  setElapsed]      = useState(0)
+  const [progress, setProgress]     = useState(0)
+  const [started,  setStarted]      = useState(false)
+  const [running,  setRunning]      = useState(false)
+  const [pins,     setPins]         = useState([])
+  const [paws,     setPaws]         = useState(0)
+  const [toasts,   setToasts]       = useState([])
+  const [pulse,    setPulse]        = useState(null)
+  const [info,     setInfo]         = useState(null)
+  const [weather,  setWeather]      = useState('맑음')
+  const [journal,  setJournal]      = useState('')
+  const [bonus,    setBonus]        = useState(0)
+  const [letter,   setLetter]       = useState('')
+  const [generating, setGenerating] = useState(false)
+  const infoT = useRef(null)
+  const press = useRef({ timer: null, fired: false })
 
-  // 진행 중 산책 데이터
-  const [route, setRoute] = useState([])
-  const [elapsed, setElapsed] = useState(0)  // 초
-  const [gpsStatus, setGpsStatus] = useState('idle')  // idle | acquiring | ok | error
+  const points  = useMemo(() => sampleRoute(makeWaypoints()), [])
+  const idx     = Math.floor(progress * (points.length - 1))
+  const dogPt   = points[Math.min(idx, points.length - 1)]
+  const distance = (progress * FULL_KM).toFixed(2)
+  const tod     = todName(new Date().getHours())
+  const canLog  = started && running
+  const allBtns = [...PRESETS, ...customs]
 
-  // 산책 완료 데이터
-  const [summary, setSummary] = useState(null)  // { distanceM, durationS, route, paws, totalPaws, reply, entry }
-  const [showPawReward, setShowPawReward] = useState(false)
+  useEffect(() => { localStorage.setItem('dogidogi_dog_name', dogName) }, [dogName])
 
-  // 일기 추가 (산책 후)
-  const [walkNote, setWalkNote] = useState('')
-  const [savingNote, setSavingNote] = useState(false)
-
-  const watchIdRef = useRef(null)
-  const timerRef = useRef(null)
-  const startTimeRef = useRef(null)
-  const pausedElapsedRef = useRef(0)
-
-  const breed = getBreed(breedId)
-
-  useEffect(() => { localStorage.setItem('dogidogi_breed', breedId) }, [breedId])
-
-  // ── GPS 추적 ────────────────────────────────────────────────
-  const startGPS = useCallback(() => {
-    if (!navigator.geolocation) {
-      setGpsStatus('error')
-      return
-    }
-    setGpsStatus('acquiring')
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      pos => {
-        const { latitude: lat, longitude: lng, accuracy } = pos.coords
-        setGpsStatus('ok')
-        setRoute(prev => {
-          if (shouldAddPoint(prev, lat, lng, 3)) {
-            return [...prev, { lat, lng, accuracy }]
-          }
-          return prev
-        })
-      },
-      () => setGpsStatus('error'),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
-    )
-  }, [])
-
-  const stopGPS = useCallback(() => {
-    if (watchIdRef.current != null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-    }
-  }, [])
-
-  // ── 타이머 ───────────────────────────────────────────────────
-  const startTimer = useCallback(() => {
-    startTimeRef.current = Date.now() - pausedElapsedRef.current * 1000
-    timerRef.current = setInterval(() => {
-      setElapsed(Math.round((Date.now() - startTimeRef.current) / 1000))
+  useEffect(() => {
+    if (!running) return
+    const t = setInterval(() => {
+      setElapsed(e => e + 1)
+      setProgress(p => Math.min(1, p + 1/TRAVERSE_SEC))
     }, 1000)
-  }, [])
+    return () => clearInterval(t)
+  }, [running])
 
-  const stopTimer = useCallback(() => {
-    clearInterval(timerRef.current)
-    timerRef.current = null
-  }, [])
+  useEffect(() => () => clearTimeout(infoT.current), [])
 
-  // ── 산책 시작 ────────────────────────────────────────────────
-  function addActivity(type) {
-    const btn = ACTIVITY_BUTTONS.find(b => b.type === type)
-    if (!btn) return
-    setActivities(prev => [...prev, { type, emoji: btn.emoji, label: btn.label, time: elapsed, at: new Date().toISOString() }])
+  function togglePlay() {
+    if (!started) { setStarted(true); setRunning(true); return }
+    setRunning(r => !r)
   }
 
-  function handleStart() {
-    setRoute([])
-    setElapsed(0)
-    pausedElapsedRef.current = 0
-    setWalkNote('')
-    setActivities([])
-    setWalkState('active')
-    startGPS()
-    startTimer()
+  function pushToast(emoji, minus) {
+    const id = Date.now() + Math.random()
+    setToasts(t => [...t, { id, emoji, minus }])
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 950)
   }
 
-  // ── 일시정지 ─────────────────────────────────────────────────
-  function handlePause() {
-    stopGPS()
-    stopTimer()
-    pausedElapsedRef.current = elapsed
-    setWalkState('paused')
+  function logMoment(tag) {
+    if (!canLog) return
+    const p = points[Math.min(idx, points.length-1)]
+    setPins(ps => [...ps, { key: Date.now()+Math.random(), emoji: tag.emoji, label: tag.label, t: elapsed, x: p.x, y: p.y }])
+    setPaws(n => n + 1)
+    setPulse(tag.id); setTimeout(() => setPulse(null), 220)
+    pushToast(tag.emoji, false)
   }
 
-  function handleResume() {
-    setWalkState('active')
-    startGPS()
-    startTimer()
+  function cancelMoment(tag) {
+    if (!canLog) return
+    let li = -1
+    for (let i = pins.length-1; i >= 0; i--) { if (pins[i].label === tag.label) { li = i; break } }
+    if (li < 0) return
+    setPins(ps => ps.filter((_,i) => i !== li))
+    setPaws(n => Math.max(0, n-1))
+    pushToast(tag.emoji, true)
   }
 
-  // ── 산책 종료 ────────────────────────────────────────────────
-  async function handleStop() {
-    stopGPS()
-    stopTimer()
-    const distanceM = calcTotalDistance(route)
-    const paws = calcWalkPaws(distanceM)
-    const totalPaws = await addPaws(paws)
-    const replyText = await generateReply(`산책 ${formatDistance(distanceM)} 완료! ${formatDuration(elapsed)} 걸었어.`)
-    setSummary({ distanceM, durationS: elapsed, route: [...route], paws, totalPaws, reply: replyText, activities: [...activities] })
-    setWalkState('summary')
-    setShowPawReward(true)
+  function onDown(tag) {
+    press.current.fired = false
+    clearTimeout(press.current.timer)
+    press.current.timer = setTimeout(() => { press.current.fired = true; cancelMoment(tag) }, 450)
+  }
+  function onUp(tag) {
+    clearTimeout(press.current.timer)
+    if (!press.current.fired) logMoment(tag)
+    press.current.fired = false
+  }
+  function onLeave() { clearTimeout(press.current.timer); press.current.fired = false }
+
+  function tapPin(p) {
+    clearTimeout(infoT.current)
+    setInfo(`${p.emoji} ${p.label} · ${fmt(p.t)}`)
+    infoT.current = setTimeout(() => setInfo(null), 2000)
   }
 
-  // ── 일기 저장 (산책 후 메모) ──────────────────────────────────
-  async function handleSaveNote() {
-    if (!walkNote.trim()) return handleDone()
-    setSavingNote(true)
-    const draft = {
-      text: `[산책] ${formatDistance(summary.distanceM)} · ${formatDuration(summary.durationS)}\n${walkNote}`,
-      reply: summary.reply,
-      paws: summary.paws,
-      walkData: { distanceM: summary.distanceM, durationS: summary.durationS },
-      activities: summary.activities,
+  function openComposer() { if (customs.length < 2) setComposer({ emoji: EMOJI_CHOICES[0], label: '' }) }
+  function confirmCustom() {
+    const l = composer.label.trim()
+    if (!l || customs.length >= 2) return
+    setCustoms(c => [...c, { id: 'c'+Date.now(), emoji: composer.emoji, label: l }])
+    setComposer(null)
+  }
+  function removeCustom(id) { setCustoms(c => c.filter(x => x.id !== id)) }
+
+  function goToJournal() {
+    setRunning(false)
+    setScreen('journal')
+  }
+
+  async function makeLetter() {
+    setScreen('letter')
+    setGenerating(true)
+    setLetter('')
+    const earned = journal.trim() ? 10 : 0
+    setBonus(earned)
+    const totalPaws = paws + earned
+    if (earned) setPaws(totalPaws)
+
+    try {
+      const counts = {}
+      pins.forEach(p => { counts[p.label] = (counts[p.label] || 0) + 1 })
+      const tagSummary = Object.entries(counts).map(([k,v]) => `${k} ${v}번`).join(', ') || '없음'
+      const walkText = `[산책] ${distance}km · ${fmt(elapsed)} · 기록: ${tagSummary}\n${journal.trim()}`
+      const replyText = await generateReply(walkText)
+      setLetter(replyText)
+      await addPaws(totalPaws)
+      const saved = await saveEntry({
+        text: walkText,
+        reply: replyText,
+        paws: totalPaws,
+        walkData: { distanceKm: parseFloat(distance), durationS: elapsed },
+        activities: pins.map(p => ({ emoji: p.emoji, label: p.label, t: p.t })),
+      })
+      syncEntry(saved)
+      onSaved?.()
+    } catch {
+      setLetter('오늘 산책도 정말 좋았어!')
     }
-    const saved = await saveEntry(draft)
-    syncEntry(saved)
-    setSavingNote(false)
-    onSaved?.()
-    handleDone()
+    setGenerating(false)
   }
 
-  function handleDone() {
-    setWalkState('idle')
-    setSummary(null)
-    setRoute([])
+  function newWalk() {
+    setScreen('idle')
+    setStarted(false)
+    setRunning(false)
     setElapsed(0)
-    pausedElapsedRef.current = 0
-    setWalkNote('')
-    setActivities([])
-    setShowPawReward(false)
+    setProgress(0)
+    setPins([])
+    setPaws(0)
+    setJournal('')
+    setBonus(0)
+    setLetter('')
   }
 
-  // cleanup on unmount
-  useEffect(() => () => {
-    stopGPS()
-    stopTimer()
-  }, [stopGPS, stopTimer])
-
-  const distanceM = calcTotalDistance(route)
+  const wEmoji = (WEATHER.find(w => w.id === weather) || {}).emoji
 
   // ── IDLE ─────────────────────────────────────────────────────
-  if (walkState === 'idle') {
+  if (screen === 'idle') {
     return (
-      <div className="walk-tab walk-idle">
-        <div className="walk-dog-area">
-          <DogSVG breed={breed} animation="sitting" size={130} />
-          <button className="breed-pill" onClick={() => setShowBreedPicker(v => !v)}>
-            {breed.emoji} {breed.name} ▾
-          </button>
-          {showBreedPicker && (
-            <div className="breed-picker">
-              {BREED_LIST.map(b => (
-                <button
-                  key={b.id}
-                  className={`breed-opt${b.id === breedId ? ' selected' : ''}`}
-                  onClick={() => { setBreedId(b.id); setShowBreedPicker(false) }}
-                >
-                  {b.emoji} {b.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <h2 className="walk-idle-title">산책하러 갈까요?</h2>
-        <p className="walk-idle-sub">GPS가 경로와 거리를 기록해요</p>
-
-        <button className="walk-start-btn" onClick={handleStart}>
-          산책 시작
-        </button>
+      <div className="wt-idle">
+        <div className="wt-idle-paw">🐾</div>
+        <b className="wt-idle-name">{dogName}</b>
+        <p className="wt-idle-sub">와 산책할 준비가 됐어요</p>
+        <button className="wt-idle-btn" onClick={() => setScreen('walk')}>산책 시작</button>
       </div>
     )
   }
 
-  // ── ACTIVE / PAUSED ──────────────────────────────────────────
-  if (walkState === 'active' || walkState === 'paused') {
-    const svgPath = routeToSVGPath(route, 200, 200)
-    const isActive = walkState === 'active'
-
+  // ── LETTER ───────────────────────────────────────────────────
+  if (screen === 'letter') {
     return (
-      <div className="walk-tab walk-active">
-        {/* GPS 상태 */}
-        <div className={`gps-badge gps-${gpsStatus}`}>
-          {gpsStatus === 'acquiring' && <><span className="pulse-ring gps-dot" />GPS 연결 중…</>}
-          {gpsStatus === 'ok'        && <><span className="gps-dot ok" />GPS 연결됨</>}
-          {gpsStatus === 'error'     && <>⚠ GPS 오류 — Wi-Fi로 대체</>}
-        </div>
-
-        {/* 통계 */}
-        <div className="walk-stats">
-          <div className="walk-stat">
-            <span className="walk-stat-value">{formatDuration(elapsed)}</span>
-            <span className="walk-stat-label">시간</span>
-          </div>
-          <div className="walk-stat-divider" />
-          <div className="walk-stat">
-            <span className="walk-stat-value">{formatDistance(distanceM)}</span>
-            <span className="walk-stat-label">거리</span>
-          </div>
-          <div className="walk-stat-divider" />
-          <div className="walk-stat">
-            <span className="walk-stat-value">{calcWalkPaws(distanceM)}</span>
-            <span className="walk-stat-label">🐾 예상</span>
-          </div>
-        </div>
-
-        {/* 루트 지도 */}
-        <div className="walk-route-box">
-          {route.length < 2 ? (
-            <div className="walk-route-empty">
-              <DogSVG breed={breed} animation={isActive ? 'sniffing' : 'sitting'} size={80} />
-              <span className="walk-route-hint">걷기 시작하면 경로가 표시됩니다</span>
+      <div className="wt-overlay">
+        <div className="wt-letter-wrap">
+          <div className="wt-env">
+            <div className="wt-env-stripe" />
+            <div className="wt-env-head">
+              <span className="wt-paw">🐾</span>
+              <b>{dogName}의 답장</b>
             </div>
-          ) : (
-            <svg viewBox="0 0 200 200" className="walk-route-svg">
-              <rect width="200" height="200" rx="16" fill="#f5efe8" />
-              <path d={svgPath} stroke="#c97a3a" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              {/* 시작점 */}
-              <circle cx={route[0] && routeStartPt(route, 200, 200).x} cy={route[0] && routeStartPt(route, 200, 200).y} r="5" fill="#5c3d1e" />
-              {/* 현재 위치 */}
-              <circle cx={routeEndPt(route, 200, 200).x} cy={routeEndPt(route, 200, 200).y} r="5" fill="#e06830" />
-            </svg>
+            {generating ? (
+              <div className="wt-loading">
+                <div className="wt-dots"><span /><span /><span /></div>
+                <p>{dogName}가 일지를 읽고 답장을 쓰는 중...</p>
+              </div>
+            ) : (
+              <>
+                <div className="wt-letter-body">
+                  {letter.split(/\n{2,}/).map((para, i) => para.trim() && <p key={i}>{para.trim()}</p>)}
+                </div>
+                <div className="wt-sign">{dogName} 올림 🐾</div>
+                <div className="wt-env-stats">
+                  <span>{tod}</span><i>·</i>
+                  <span>{wEmoji} {weather}</span><i>·</i>
+                  <span>{fmt(elapsed)}</span><i>·</i>
+                  <span>{distance}km</span><i>·</i>
+                  <span>순간 {pins.length}</span>
+                </div>
+                {bonus > 0 && <div className="wt-bonus">🐾 일지 보너스 +{bonus} · 누적 {paws}</div>}
+              </>
+            )}
+          </div>
+          {!generating && (
+            <button className="wt-again" onClick={newWalk}>새 산책 시작</button>
           )}
         </div>
+      </div>
+    )
+  }
 
-        {/* 활동 버튼 */}
-        <div className="walk-activity-panel">
-          {ACTIVITY_BUTTONS.map(btn => {
-            const count = activities.filter(a => a.type === btn.type).length
+  // ── JOURNAL ──────────────────────────────────────────────────
+  if (screen === 'journal') {
+    const counts = {}
+    pins.forEach(p => { counts[p.label] = (counts[p.label] || 0) + 1 })
+    return (
+      <div className="wt-overlay">
+        <header className="wt-hd">
+          <div className="wt-hd-top">
+            <div className="wt-hd-name">
+              <span className="wt-paw">🐾</span>
+              <b>오늘의 산책일지</b>
+            </div>
+          </div>
+        </header>
+        <div className="wt-journal-body">
+          <div className="wt-recall">
+            <div className="wt-recall-row">{tod} · {fmt(elapsed)} · {distance}km · 순간 {pins.length}개</div>
+            <div className="wt-chips">
+              {Object.entries(counts).map(([k,v]) => (
+                <span key={k} className="wt-chip">
+                  {(allBtns.find(t => t.label === k) || {}).emoji} {k} {v}
+                </span>
+              ))}
+              {pins.length === 0 && <span className="wt-chip wt-muted">기록된 순간 없음</span>}
+            </div>
+          </div>
+          <label className="wt-field-label">오늘 날씨</label>
+          <div className="wt-weather-row">
+            {WEATHER.map(w => (
+              <button key={w.id} className={`wt-wbtn${weather === w.id ? ' on' : ''}`} onClick={() => setWeather(w.id)}>
+                {w.emoji} {w.id}
+              </button>
+            ))}
+          </div>
+          <label className="wt-field-label">{dogName}에게 오늘 산책 이야기를 들려주세요</label>
+          <textarea
+            className="wt-journal-input"
+            value={journal}
+            onChange={e => setJournal(e.target.value)}
+            placeholder="예: 오늘 좀 더웠는데 새 길로 가봤어. 거기서 친구도 만나고 풀밭에서 신났네."
+            rows={5}
+          />
+          <p className="wt-hint">자세히 적을수록 {dogName}의 답장이 진해져요. 일지를 남기면 🐾 보너스도 받아요.</p>
+        </div>
+        <footer className="wt-ft wt-jft">
+          <button className="wt-ghost" onClick={makeLetter}>건너뛰고 답장 받기</button>
+          <button className="wt-end" onClick={makeLetter} disabled={!journal.trim()}>
+            일지 남기고 답장 🐾+10
+          </button>
+        </footer>
+      </div>
+    )
+  }
+
+  // ── WALK ─────────────────────────────────────────────────────
+  return (
+    <div className="wt-overlay">
+      <header className="wt-hd">
+        <div className="wt-hd-top">
+          <div className="wt-hd-name">
+            <span className="wt-paw">🐾</span>
+            <b>{dogName}</b>
+            <span className="wt-sub">
+              {!started ? '와 산책 준비' : running ? '랑 걷는 중' : '랑 쉬는 중'}
+            </span>
+          </div>
+          <div className="wt-hd-right">
+            <button className="wt-gear" onClick={() => setSettingsOpen(true)} aria-label="설정">⚙</button>
+            <button className={`wt-ctrl ${running ? 'pause' : 'go'}`} onClick={togglePlay}>
+              {running ? (
+                <svg viewBox="0 0 12 12">
+                  <rect x="2.6" y="1.6" width="2.6" height="8.8" rx="1"/>
+                  <rect x="6.8" y="1.6" width="2.6" height="8.8" rx="1"/>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 12 12"><path d="M2.5 1.4 L10.6 6 L2.5 10.6 Z"/></svg>
+              )}
+              <span>{!started ? '시작' : running ? '멈춤' : '재생'}</span>
+            </button>
+          </div>
+        </div>
+        <div className="wt-hd-stats">
+          <span className={`wt-clock${started && !running ? ' dim' : ''}`}>{fmt(elapsed)}</span>
+          <i>·</i><span>{distance}km</span>
+          <i>·</i><span>순간 {pins.length}</span>
+          <i>·</i><span className="wt-pawcount">🐾 {paws}</span>
+        </div>
+      </header>
+
+      <div className="wt-mapwrap">
+        <svg className="wt-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="산책 경로">
+          <rect x="0" y="0" width={W} height={H} className="wt-map-bg"/>
+          <g className="wt-streets">
+            {SH.map(y => <line key={'h'+y} x1="0" y1={y} x2={W} y2={y}/>)}
+            {SV.map(x => <line key={'v'+x} x1={x} y1="0" x2={x} y2={H}/>)}
+          </g>
+          {BLOCKS.map((b,i) => (
+            <rect key={i} x={b.x} y={b.y} width={b.w} height={b.h} rx="9"
+              className={b.park ? 'wt-block wt-park' : 'wt-block'}/>
+          ))}
+          <polyline className="wt-route-base" points={poly(points)}/>
+          {idx > 1 && <polyline className="wt-route-live" points={poly(points.slice(0, idx+1))}/>}
+          <circle cx={points[0].x} cy={points[0].y} r="20" className="wt-start-fuzz"/>
+          <circle cx={points[0].x} cy={points[0].y} r="5"  className="wt-start-dot"/>
+          {pins.map(p => (
+            <g key={p.key} className="wt-pin" transform={`translate(${p.x} ${p.y})`}
+              onClick={() => tapPin(p)} role="button">
+              <circle r="14" className="wt-pin-bg"/>
+              <text y="5" textAnchor="middle" className="wt-pin-emo">{p.emoji}</text>
+            </g>
+          ))}
+          {started && (
+            <g className="wt-dogmark" transform={`translate(${dogPt.x} ${dogPt.y})`}>
+              <circle r="15" className="wt-dogmark-bg"/>
+              <text y="6" textAnchor="middle" className="wt-dogmark-emo">🐕</text>
+            </g>
+          )}
+        </svg>
+        {info && <div className="wt-info-chip">{info}</div>}
+        {!started && <div className="wt-map-hint">▶ 시작을 누르면 경로가 그려져요</div>}
+        <div className="wt-toasts">
+          {toasts.map(t => (
+            <span key={t.id} className={`wt-toast${t.minus ? ' minus' : ''}`}>
+              {t.emoji} {t.minus ? '취소' : '🐾 +1'}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="wt-tags-wrap">
+        <div className="wt-tag-hint">짧게 눌러 기록 · 꾹 눌러 방금 기록 취소</div>
+        <div className="wt-tags">
+          {allBtns.map(tag => {
+            const n   = pins.filter(p => p.label === tag.label).length
+            const isC = tag.id.startsWith('c')
             return (
-              <button key={btn.type} className="walk-act-btn" onClick={() => addActivity(btn.type)}>
-                <span className="act-emoji">{btn.emoji}</span>
-                <span className="act-label">{btn.label}</span>
-                {count > 0 && <span className="act-count">{count}</span>}
+              <button
+                key={tag.id}
+                className={`wt-tag${isC ? ' mine' : ''}${pulse === tag.id ? ' tapped' : ''}`}
+                disabled={!canLog}
+                onPointerDown={() => onDown(tag)}
+                onPointerUp={() => onUp(tag)}
+                onPointerLeave={onLeave}
+                onPointerCancel={onLeave}
+                onContextMenu={e => e.preventDefault()}
+              >
+                {isC && (
+                  <span className="wt-rm" role="button" aria-label="삭제"
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); removeCustom(tag.id) }}>
+                    ×
+                  </span>
+                )}
+                <span className="wt-emo">{tag.emoji}</span>
+                <span className="wt-lab">{tag.label}</span>
+                {n > 0 && <span className="wt-cnt">{n}</span>}
               </button>
             )
           })}
-        </div>
-
-        {/* 활동 로그 */}
-        {activities.length > 0 && (
-          <div className="walk-activity-log">
-            {activities.slice(-3).map((a, i) => (
-              <span key={i} className="act-log-chip">{a.emoji} {a.label} {formatDuration(a.time)}</span>
-            ))}
-            {activities.length > 3 && <span className="act-log-more">+{activities.length - 3}개</span>}
-          </div>
-        )}
-
-        {/* 컨트롤 */}
-        <div className="walk-controls">
-          {isActive ? (
-            <button className="walk-ctrl-btn pause" onClick={handlePause}>⏸ 일시정지</button>
-          ) : (
-            <button className="walk-ctrl-btn resume" onClick={handleResume}>▶ 계속하기</button>
+          {customs.length < 2 && (
+            <button className="wt-tag wt-add" onClick={openComposer}>
+              <span className="wt-plus">＋</span>
+              <span className="wt-lab">추가</span>
+            </button>
           )}
-          <button className="walk-ctrl-btn stop" onClick={handleStop}>⏹ 산책 완료</button>
         </div>
       </div>
-    )
-  }
 
-  // ── SUMMARY ──────────────────────────────────────────────────
-  if (walkState === 'summary' && summary) {
-    return (
-      <div className="walk-tab walk-summary">
-        {showPawReward && (
-          <PawReward count={Math.min(summary.paws, 12)} onDone={() => setShowPawReward(false)} />
-        )}
+      <footer className="wt-ft">
+        {!started
+          ? <p className="wt-ready-hint">버튼을 누르면 그 위치에 순간이 핀으로 박혀요.</p>
+          : <button className="wt-end" onClick={goToJournal}>산책 끝내고 일지 쓰기</button>
+        }
+      </footer>
 
-        <div className="summary-dog">
-          <DogSVG breed={breed} animation="walking" size={100} />
-        </div>
-
-        <div className="summary-stats">
-          <div className="summary-stat">
-            <span className="summary-stat-icon">📍</span>
-            <span className="summary-stat-val">{formatDistance(summary.distanceM)}</span>
-            <span className="summary-stat-lbl">거리</span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-icon">⏱</span>
-            <span className="summary-stat-val">{formatDuration(summary.durationS)}</span>
-            <span className="summary-stat-lbl">시간</span>
-          </div>
-          <div className="summary-stat paw-stat">
-            <span className="summary-stat-icon">🐾</span>
-            <span className="summary-stat-val">+{summary.paws}</span>
-            <span className="summary-stat-lbl">발자국</span>
+      {settingsOpen && (
+        <div className="wt-sheet-wrap" onClick={() => setSettingsOpen(false)}>
+          <div className="wt-sheet" onClick={e => e.stopPropagation()}>
+            <div className="wt-sheet-bar"/>
+            <h3 className="wt-sheet-h">강아지 이름</h3>
+            <p className="wt-sheet-p">산책 화면에 표시되는 이름을 설정해요.</p>
+            <label className="wt-field-label">이름</label>
+            <input
+              className="wt-hon-input"
+              value={dogName}
+              maxLength={8}
+              onChange={e => setDogName(e.target.value)}
+              placeholder="예: 보리, 콩이, 몽이"
+            />
+            <button className="wt-confirm" onClick={() => setSettingsOpen(false)}>완료</button>
           </div>
         </div>
+      )}
 
-        {summary.reply && (
-          <div className="summary-reply-bubble">
-            <p>{summary.reply.split('\n')[0]}</p>
+      {composer && (
+        <div className="wt-sheet-wrap" onClick={() => setComposer(null)}>
+          <div className="wt-sheet" onClick={e => e.stopPropagation()}>
+            <div className="wt-sheet-bar"/>
+            <h3 className="wt-sheet-h">내 버튼 만들기</h3>
+            <p className="wt-sheet-p">우리 {dogName}한테만 있는 순간을 버튼으로.</p>
+            <div className="wt-preview">
+              <span className="wt-emo wt-big">{composer.emoji}</span>
+              <span className="wt-lab">{composer.label || '이름'}</span>
+            </div>
+            <div className="wt-emoji-row">
+              {EMOJI_CHOICES.map(e => (
+                <button key={e} className={`wt-e-pick${composer.emoji === e ? ' on' : ''}`}
+                  onClick={() => setComposer(c => ({ ...c, emoji: e }))}>
+                  {e}
+                </button>
+              ))}
+            </div>
+            <input
+              className="wt-hon-input"
+              placeholder="버튼 이름 (예: 다람쥐)"
+              maxLength={5}
+              value={composer.label}
+              onChange={e => setComposer(c => ({ ...c, label: e.target.value }))}
+            />
+            <div className="wt-seg2" style={{ marginTop: 14 }}>
+              <button onClick={() => setComposer(null)} style={{ color: 'var(--muted)' }}>취소</button>
+              <button className="on" onClick={confirmCustom}>추가</button>
+            </div>
           </div>
-        )}
-
-        <div className="summary-note-area">
-          <textarea
-            className="summary-note-input"
-            placeholder="오늘 산책 한 줄 일기 (선택)"
-            value={walkNote}
-            onChange={e => setWalkNote(e.target.value)}
-            rows={2}
-            maxLength={150}
-          />
         </div>
-
-        <div className="summary-actions">
-          <button className="summary-save-btn" onClick={handleSaveNote} disabled={savingNote}>
-            {savingNote ? '저장 중…' : walkNote.trim() ? '기록하고 끝내기' : '끝내기'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return null
-}
-
-// SVG 좌표 계산 헬퍼
-function routeStartPt(points, w, h) {
-  return calcRoutePt(points, 0, w, h)
-}
-function routeEndPt(points, w, h) {
-  return calcRoutePt(points, points.length - 1, w, h)
-}
-function calcRoutePt(points, idx, w, h, pad = 16) {
-  if (!points.length) return { x: w / 2, y: h / 2 }
-  const lats = points.map(p => p.lat)
-  const lngs = points.map(p => p.lng)
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs)
-  const rangeW = maxLng - minLng || 0.0001
-  const rangeH = maxLat - minLat || 0.0001
-  const usableW = w - pad * 2
-  const usableH = h - pad * 2
-  const scale = Math.min(usableW / rangeW, usableH / rangeH)
-  const offsetX = pad + (usableW - rangeW * scale) / 2
-  const offsetY = pad + (usableH - rangeH * scale) / 2
-  const p = points[idx]
-  return {
-    x: offsetX + (p.lng - minLng) * scale,
-    y: offsetY + (maxLat - p.lat) * scale,
-  }
+      )}
+    </div>
+  )
 }
