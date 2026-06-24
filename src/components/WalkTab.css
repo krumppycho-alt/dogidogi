@@ -600,6 +600,38 @@
   background: color-mix(in srgb, var(--pine) 12%, var(--surface));
 }
 
+/* ── 내 위치 버튼 ── */
+.dp-locate {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 1000;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 3px 10px var(--shadow);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pine);
+  transition: transform .12s, opacity .15s;
+  padding: 0;
+}
+.dp-locate:active { transform: scale(.92); }
+.dp-locate.disabled { opacity: .38; cursor: default; }
+
+/* ── 경로 꼬리 펄스 애니메이션 ── */
+.wt-route-tail {
+  animation: wt-tail-pulse 1.8s ease-in-out infinite;
+}
+@keyframes wt-tail-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1; }
+}
+
 /* ── 강아지 사진 설정 ── */
 .wt-photo-row {
   display: flex;
