@@ -3,6 +3,8 @@ import { addPaws } from '../lib/paws'
 import { generateReply } from '../lib/reply'
 import { saveEntry } from '../lib/storage'
 import { syncEntry } from '../lib/sync'
+import { shouldAddPoint, calcTotalDistance, formatDistance, formatDuration } from '../lib/geo'
+import WalkMap from './WalkMap'
 import './WalkTab.css'
 
 const PRESETS = [
@@ -25,97 +27,117 @@ const WEATHER = [
   { id: '추움', emoji: '❄️' },
 ]
 
-const W = 340, H = 360, TRAVERSE_SEC = 60, FULL_KM = 1.7
-const BLOCKS = [
-  { x: 24,  y: 46,  w: 80, h: 58 },
-  { x: 232, y: 38,  w: 84, h: 64, park: true },
-  { x: 40,  y: 154, w: 66, h: 78 },
-  { x: 234, y: 146, w: 82, h: 86 },
-  { x: 120, y: 248, w: 90, h: 62, park: true },
-  { x: 28,  y: 258, w: 64, h: 70 },
-]
-const SH = [62, 136, 214, 282], SV = [80, 170, 256]
-
-function makeWaypoints() {
-  const pts = [[170, 322]]; let x = 170, y = 322
-  ;[[-70,-42],[40,-48],[76,-38],[-30,-50],[-84,-38],[24,-48],[68,-40],[-42,-32]].forEach(([dx,dy]) => {
-    x = Math.max(38, Math.min(W-38, x + dx + (Math.random()*20-10)))
-    y = Math.max(34, Math.min(H-34, y + dy + (Math.random()*14-7)))
-    pts.push([Math.round(x), Math.round(y)])
-  })
-  return pts
-}
-
-function sampleRoute(pts) {
-  const out = [{ x: pts[0][0], y: pts[0][1] }], steps = 18
-  for (let i = 1; i < pts.length - 1; i++) {
-    const p0 = out[out.length-1]
-    const c  = { x: pts[i][0], y: pts[i][1] }
-    const m  = { x: (pts[i][0]+pts[i+1][0])/2, y: (pts[i][1]+pts[i+1][1])/2 }
-    for (let s = 1; s <= steps; s++) {
-      const t = s/steps
-      out.push({ x:(1-t)*(1-t)*p0.x+2*(1-t)*t*c.x+t*t*m.x, y:(1-t)*(1-t)*p0.y+2*(1-t)*t*c.y+t*t*m.y })
-    }
-  }
-  const last = pts[pts.length-1], p0 = out[out.length-1]
-  for (let s = 1; s <= steps; s++) {
-    const t = s/steps
-    out.push({ x: p0.x+(last[0]-p0.x)*t, y: p0.y+(last[1]-p0.y)*t })
-  }
-  return out
-}
-
-const poly  = (a) => a.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-const fmt   = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`
+const fmt = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`
 const todName = (h) => h < 6 ? '이른 새벽' : h < 11 ? '아침' : h < 16 ? '한낮' : h < 19 ? '해질녘' : h < 22 ? '저녁' : '밤'
 
-export default function WalkTab({ onSaved }) {
-  const [dogName, setDogName]       = useState(() => localStorage.getItem('dogidogi_dog_name') || '우리 강아지')
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [composer, setComposer]     = useState(null)
-  const [customs,  setCustoms]      = useState([])
-  const [screen,   setScreen]       = useState('idle')   // idle | walk | journal | letter
-  const [elapsed,  setElapsed]      = useState(0)
-  const [progress, setProgress]     = useState(0)
-  const [started,  setStarted]      = useState(false)
-  const [running,  setRunning]      = useState(false)
-  const [pins,     setPins]         = useState([])
-  const [paws,     setPaws]         = useState(0)
-  const [toasts,   setToasts]       = useState([])
-  const [pulse,    setPulse]        = useState(null)
-  const [info,     setInfo]         = useState(null)
-  const [weather,  setWeather]      = useState('맑음')
-  const [journal,  setJournal]      = useState('')
-  const [bonus,    setBonus]        = useState(0)
-  const [letter,   setLetter]       = useState('')
-  const [generating, setGenerating] = useState(false)
-  const infoT = useRef(null)
-  const press = useRef({ timer: null, fired: false })
+function resizeImage(file, size = 200) {
+  return new Promise(resolve => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = size; canvas.height = size
+      const ctx = canvas.getContext('2d')
+      const min = Math.min(img.width, img.height)
+      const sx = (img.width - min) / 2, sy = (img.height - min) / 2
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.85))
+    }
+    img.src = url
+  })
+}
 
-  const points  = useMemo(() => sampleRoute(makeWaypoints()), [])
-  const idx     = Math.floor(progress * (points.length - 1))
-  const dogPt   = points[Math.min(idx, points.length - 1)]
-  const distance = (progress * FULL_KM).toFixed(2)
-  const tod     = todName(new Date().getHours())
-  const canLog  = started && running
-  const allBtns = [...PRESETS, ...customs]
+export default function WalkTab({ onSaved }) {
+  const [dogName, setDogName]         = useState(() => localStorage.getItem('dogidogi_dog_name') || '우리 강아지')
+  const [dogPhoto, setDogPhoto]       = useState(() => localStorage.getItem('dogidogi_dog_photo') || null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [composer, setComposer]       = useState(null)
+  const [customs,  setCustoms]        = useState([])
+  const [screen,   setScreen]         = useState('idle')
+  const [elapsed,  setElapsed]        = useState(0)
+  const [started,  setStarted]        = useState(false)
+  const [running,  setRunning]        = useState(false)
+
+  // GPS 상태
+  const [route,      setRoute]      = useState([])
+  const [currentPos, setCurrentPos] = useState(null)
+  const [gpsStatus,  setGpsStatus]  = useState('idle')  // idle | acquiring | ok | error
+
+  const [pins,      setPins]        = useState([])  // 기록된 순간 (지도 마커 + 일지용)
+  const [paws,      setPaws]        = useState(0)
+  const [toasts,    setToasts]      = useState([])
+  const [pulse,     setPulse]       = useState(null)
+  const [pinEmoji,  setPinEmoji]    = useState(null)  // 강아지 핀 말풍선
+
+  const [weather,   setWeather]     = useState('맑음')
+  const [journal,   setJournal]     = useState('')
+  const [bonus,     setBonus]       = useState(0)
+  const [letter,    setLetter]      = useState('')
+  const [generating, setGenerating] = useState(false)
+
+  const watchIdRef       = useRef(null)
+  const timerRef         = useRef(null)
+  const pinEmojiTimer    = useRef(null)
+  const press            = useRef({ timer: null, fired: false })
+
+  const distanceM    = useMemo(() => calcTotalDistance(route), [route])
+  const distanceStr  = formatDistance(distanceM)
+  const tod          = todName(new Date().getHours())
+  const canLog       = started && running
+  const allBtns      = [...PRESETS, ...customs]
+  const wEmoji       = (WEATHER.find(w => w.id === weather) || {}).emoji
 
   useEffect(() => { localStorage.setItem('dogidogi_dog_name', dogName) }, [dogName])
 
+  // 산책 화면 진입 시 GPS 시작 (빠른 위치 확보)
   useEffect(() => {
-    if (!running) return
-    const t = setInterval(() => {
-      setElapsed(e => e + 1)
-      setProgress(p => Math.min(1, p + 1/TRAVERSE_SEC))
-    }, 1000)
-    return () => clearInterval(t)
+    if (screen === 'walk') {
+      startGPS()
+    } else {
+      stopGPS()
+    }
+    return () => stopGPS()
+  }, [screen])
+
+  // 타이머
+  useEffect(() => {
+    if (!running) { clearInterval(timerRef.current); return }
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+    return () => clearInterval(timerRef.current)
   }, [running])
 
-  useEffect(() => () => clearTimeout(infoT.current), [])
+  function startGPS() {
+    if (!navigator.geolocation || watchIdRef.current != null) return
+    setGpsStatus('acquiring')
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords
+        setGpsStatus('ok')
+        setCurrentPos({ lat, lng })
+        setRoute(prev => shouldAddPoint(prev, lat, lng, 5) ? [...prev, { lat, lng }] : prev)
+      },
+      () => setGpsStatus('error'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+    )
+  }
+
+  function stopGPS() {
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+  }
 
   function togglePlay() {
     if (!started) { setStarted(true); setRunning(true); return }
     setRunning(r => !r)
+  }
+
+  function reactPinEmoji(emoji) {
+    clearTimeout(pinEmojiTimer.current)
+    setPinEmoji(emoji)
+    pinEmojiTimer.current = setTimeout(() => setPinEmoji(null), 2200)
   }
 
   function pushToast(emoji, minus) {
@@ -126,20 +148,29 @@ export default function WalkTab({ onSaved }) {
 
   function logMoment(tag) {
     if (!canLog) return
-    const p = points[Math.min(idx, points.length-1)]
-    setPins(ps => [...ps, { key: Date.now()+Math.random(), emoji: tag.emoji, label: tag.label, t: elapsed, x: p.x, y: p.y }])
+    const pos = currentPos || null
+    setPins(ps => [...ps, {
+      key: Date.now() + Math.random(),
+      emoji: tag.emoji,
+      label: tag.label,
+      t: elapsed,
+      pos,
+    }])
     setPaws(n => n + 1)
     setPulse(tag.id); setTimeout(() => setPulse(null), 220)
+    reactPinEmoji(tag.emoji)
     pushToast(tag.emoji, false)
   }
 
   function cancelMoment(tag) {
     if (!canLog) return
     let li = -1
-    for (let i = pins.length-1; i >= 0; i--) { if (pins[i].label === tag.label) { li = i; break } }
+    for (let i = pins.length-1; i >= 0; i--) {
+      if (pins[i].label === tag.label) { li = i; break }
+    }
     if (li < 0) return
-    setPins(ps => ps.filter((_,i) => i !== li))
-    setPaws(n => Math.max(0, n-1))
+    setPins(ps => ps.filter((_, i) => i !== li))
+    setPaws(n => Math.max(0, n - 1))
     pushToast(tag.emoji, true)
   }
 
@@ -155,12 +186,6 @@ export default function WalkTab({ onSaved }) {
   }
   function onLeave() { clearTimeout(press.current.timer); press.current.fired = false }
 
-  function tapPin(p) {
-    clearTimeout(infoT.current)
-    setInfo(`${p.emoji} ${p.label} · ${fmt(p.t)}`)
-    infoT.current = setTimeout(() => setInfo(null), 2000)
-  }
-
   function openComposer() { if (customs.length < 2) setComposer({ emoji: EMOJI_CHOICES[0], label: '' }) }
   function confirmCustom() {
     const l = composer.label.trim()
@@ -172,7 +197,21 @@ export default function WalkTab({ onSaved }) {
 
   function goToJournal() {
     setRunning(false)
+    stopGPS()
     setScreen('journal')
+  }
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const resized = await resizeImage(file, 200)
+    setDogPhoto(resized)
+    localStorage.setItem('dogidogi_dog_photo', resized)
+  }
+
+  function removePhoto() {
+    setDogPhoto(null)
+    localStorage.removeItem('dogidogi_dog_photo')
   }
 
   async function makeLetter() {
@@ -188,7 +227,7 @@ export default function WalkTab({ onSaved }) {
       const counts = {}
       pins.forEach(p => { counts[p.label] = (counts[p.label] || 0) + 1 })
       const tagSummary = Object.entries(counts).map(([k,v]) => `${k} ${v}번`).join(', ') || '없음'
-      const walkText = `[산책] ${distance}km · ${fmt(elapsed)} · 기록: ${tagSummary}\n${journal.trim()}`
+      const walkText = `[산책] ${distanceStr} · ${fmt(elapsed)} · 기록: ${tagSummary}\n${journal.trim()}`
       const replyText = await generateReply(walkText)
       setLetter(replyText)
       await addPaws(totalPaws)
@@ -196,7 +235,7 @@ export default function WalkTab({ onSaved }) {
         text: walkText,
         reply: replyText,
         paws: totalPaws,
-        walkData: { distanceKm: parseFloat(distance), durationS: elapsed },
+        walkData: { distanceKm: distanceM / 1000, durationS: elapsed },
         activities: pins.map(p => ({ emoji: p.emoji, label: p.label, t: p.t })),
       })
       syncEntry(saved)
@@ -212,17 +251,18 @@ export default function WalkTab({ onSaved }) {
     setStarted(false)
     setRunning(false)
     setElapsed(0)
-    setProgress(0)
+    setRoute([])
+    setCurrentPos(null)
+    setGpsStatus('idle')
     setPins([])
     setPaws(0)
+    setPinEmoji(null)
     setJournal('')
     setBonus(0)
     setLetter('')
   }
 
-  const wEmoji = (WEATHER.find(w => w.id === weather) || {}).emoji
-
-  // ── IDLE ─────────────────────────────────────────────────────
+  // ── IDLE ──────────────────────────────────────────────────────
   if (screen === 'idle') {
     return (
       <div className="wt-idle">
@@ -234,7 +274,7 @@ export default function WalkTab({ onSaved }) {
     )
   }
 
-  // ── LETTER ───────────────────────────────────────────────────
+  // ── LETTER ────────────────────────────────────────────────────
   if (screen === 'letter') {
     return (
       <div className="wt-overlay">
@@ -260,7 +300,7 @@ export default function WalkTab({ onSaved }) {
                   <span>{tod}</span><i>·</i>
                   <span>{wEmoji} {weather}</span><i>·</i>
                   <span>{fmt(elapsed)}</span><i>·</i>
-                  <span>{distance}km</span><i>·</i>
+                  <span>{distanceStr}</span><i>·</i>
                   <span>순간 {pins.length}</span>
                 </div>
                 {bonus > 0 && <div className="wt-bonus">🐾 일지 보너스 +{bonus} · 누적 {paws}</div>}
@@ -275,7 +315,7 @@ export default function WalkTab({ onSaved }) {
     )
   }
 
-  // ── JOURNAL ──────────────────────────────────────────────────
+  // ── JOURNAL ───────────────────────────────────────────────────
   if (screen === 'journal') {
     const counts = {}
     pins.forEach(p => { counts[p.label] = (counts[p.label] || 0) + 1 })
@@ -291,7 +331,7 @@ export default function WalkTab({ onSaved }) {
         </header>
         <div className="wt-journal-body">
           <div className="wt-recall">
-            <div className="wt-recall-row">{tod} · {fmt(elapsed)} · {distance}km · 순간 {pins.length}개</div>
+            <div className="wt-recall-row">{tod} · {fmt(elapsed)} · {distanceStr} · 순간 {pins.length}개</div>
             <div className="wt-chips">
               {Object.entries(counts).map(([k,v]) => (
                 <span key={k} className="wt-chip">
@@ -329,7 +369,9 @@ export default function WalkTab({ onSaved }) {
     )
   }
 
-  // ── WALK ─────────────────────────────────────────────────────
+  // ── WALK ──────────────────────────────────────────────────────
+  const eventPins = pins.filter(p => p.pos != null)
+
   return (
     <div className="wt-overlay">
       <header className="wt-hd">
@@ -358,43 +400,31 @@ export default function WalkTab({ onSaved }) {
         </div>
         <div className="wt-hd-stats">
           <span className={`wt-clock${started && !running ? ' dim' : ''}`}>{fmt(elapsed)}</span>
-          <i>·</i><span>{distance}km</span>
+          <i>·</i><span>{distanceStr}</span>
           <i>·</i><span>순간 {pins.length}</span>
           <i>·</i><span className="wt-pawcount">🐾 {paws}</span>
+          {gpsStatus === 'acquiring' && <span className="wt-gps acquiring" title="GPS 연결 중">●</span>}
+          {gpsStatus === 'ok'        && <span className="wt-gps ok"        title="GPS 연결됨">●</span>}
+          {gpsStatus === 'error'     && <span className="wt-gps err"       title="GPS 오류">⚠</span>}
         </div>
       </header>
 
       <div className="wt-mapwrap">
-        <svg className="wt-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="산책 경로">
-          <rect x="0" y="0" width={W} height={H} className="wt-map-bg"/>
-          <g className="wt-streets">
-            {SH.map(y => <line key={'h'+y} x1="0" y1={y} x2={W} y2={y}/>)}
-            {SV.map(x => <line key={'v'+x} x1={x} y1="0" x2={x} y2={H}/>)}
-          </g>
-          {BLOCKS.map((b,i) => (
-            <rect key={i} x={b.x} y={b.y} width={b.w} height={b.h} rx="9"
-              className={b.park ? 'wt-block wt-park' : 'wt-block'}/>
-          ))}
-          <polyline className="wt-route-base" points={poly(points)}/>
-          {idx > 1 && <polyline className="wt-route-live" points={poly(points.slice(0, idx+1))}/>}
-          <circle cx={points[0].x} cy={points[0].y} r="20" className="wt-start-fuzz"/>
-          <circle cx={points[0].x} cy={points[0].y} r="5"  className="wt-start-dot"/>
-          {pins.map(p => (
-            <g key={p.key} className="wt-pin" transform={`translate(${p.x} ${p.y})`}
-              onClick={() => tapPin(p)} role="button">
-              <circle r="14" className="wt-pin-bg"/>
-              <text y="5" textAnchor="middle" className="wt-pin-emo">{p.emoji}</text>
-            </g>
-          ))}
-          {started && (
-            <g className="wt-dogmark" transform={`translate(${dogPt.x} ${dogPt.y})`}>
-              <circle r="15" className="wt-dogmark-bg"/>
-              <text y="6" textAnchor="middle" className="wt-dogmark-emo">🐕</text>
-            </g>
-          )}
-        </svg>
-        {info && <div className="wt-info-chip">{info}</div>}
-        {!started && <div className="wt-map-hint">▶ 시작을 누르면 경로가 그려져요</div>}
+        <WalkMap
+          route={route}
+          currentPos={currentPos}
+          eventPins={eventPins}
+          dogPhoto={dogPhoto}
+          dogName={dogName}
+          pinEmoji={pinEmoji}
+          started={started}
+        />
+        {!started && (
+          <div className="wt-map-hint">▶ 시작을 누르면 경로가 그려져요</div>
+        )}
+        {gpsStatus === 'acquiring' && started && (
+          <div className="wt-map-hint wt-gps-hint">GPS 위치 확인 중...</div>
+        )}
         <div className="wt-toasts">
           {toasts.map(t => (
             <span key={t.id} className={`wt-toast${t.minus ? ' minus' : ''}`}>
@@ -450,13 +480,14 @@ export default function WalkTab({ onSaved }) {
         }
       </footer>
 
+      {/* 설정 시트 */}
       {settingsOpen && (
         <div className="wt-sheet-wrap" onClick={() => setSettingsOpen(false)}>
           <div className="wt-sheet" onClick={e => e.stopPropagation()}>
             <div className="wt-sheet-bar"/>
-            <h3 className="wt-sheet-h">강아지 이름</h3>
-            <p className="wt-sheet-p">산책 화면에 표시되는 이름을 설정해요.</p>
-            <label className="wt-field-label">이름</label>
+            <h3 className="wt-sheet-h">설정</h3>
+
+            <label className="wt-field-label">강아지 이름</label>
             <input
               className="wt-hon-input"
               value={dogName}
@@ -464,11 +495,33 @@ export default function WalkTab({ onSaved }) {
               onChange={e => setDogName(e.target.value)}
               placeholder="예: 보리, 콩이, 몽이"
             />
+
+            <label className="wt-field-label" style={{ marginTop: 16 }}>강아지 사진</label>
+            <p className="wt-sheet-p" style={{ marginBottom: 10 }}>지도 핀에 표시되는 사진이에요.</p>
+            <div className="wt-photo-row">
+              <div className="wt-photo-circle">
+                {dogPhoto
+                  ? <img src={dogPhoto} className="wt-photo-img" alt="강아지" />
+                  : <span className="wt-photo-empty">🐕</span>
+                }
+              </div>
+              <div className="wt-photo-btns">
+                <label className="wt-photo-upload">
+                  사진 {dogPhoto ? '변경' : '추가'}
+                  <input type="file" accept="image/*" hidden onChange={handlePhotoChange} />
+                </label>
+                {dogPhoto && (
+                  <button className="wt-photo-remove" onClick={removePhoto}>삭제</button>
+                )}
+              </div>
+            </div>
+
             <button className="wt-confirm" onClick={() => setSettingsOpen(false)}>완료</button>
           </div>
         </div>
       )}
 
+      {/* 커스텀 버튼 만들기 */}
       {composer && (
         <div className="wt-sheet-wrap" onClick={() => setComposer(null)}>
           <div className="wt-sheet" onClick={e => e.stopPropagation()}>
